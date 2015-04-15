@@ -1,0 +1,44 @@
+## Richard suggestion:
+# Fit a logistic model for "had berries" and an ordered logit model for "ripeness". 
+# 2 models: 1) binary logistic; 2) ordered logit
+
+huckB<-huckbranchmast2
+
+#Berryness... 1-5 --> 0-4
+huckbranchmast2$Berryness2<-huckbranchmast2$Berryness-1
+
+#Berry presence/absense ... if 0 vs if 1-4
+huckbranchmast2$Berry <- ifelse(huckbranchmast2$Berryness2==0, 0, 1)
+
+#Model 1: Flowering:
+m1<-glm(Berry~(cc+I(cc^2))*Diameter, data= huckbranchmast2,family = binomial)
+summary(m1)
+
+m2<-glm(Berry~(cc+I(cc^2)), data= huckbranchmast2,family = binomial)
+summary(m2)
+plot(Berry~cc, data= huckbranchmast2)
+lines(predict(m2))
+
+# Model 2: Ordered Logit:
+# Goal: Berryness ~ CanopyCover * StemDiam* TreeStuff* UnderstoryStuff * LitterDuff * SoilType * Elev * Aspect
+# Ordered data... turn Berryness into a cumulative probability
+pr_k <- table( huckbranchmast2$Berryness ) / nrow(huckbranchmast2)
+pr_k
+
+# cumsum converts to cumulative proportions
+cum_pr_k <- cumsum( pr_k )
+cum_pr_k
+
+# plot
+plot(names(cum_pr_k) , cum_pr_k , type="b" , xlab="Berryness",ylab="cumulative proportion" , ylim=c(0,1) )
+
+# create a logit function
+logit <- function(x) log(x/(1-x)) # convenience function 
+( lco <- logit( cum_pr_k ) )  # run the logit of the cumulative probabilities
+plot(names(lco) , lco , type="b" , xlab="Berryness",ylab="logit of cumulative proportion" , ylim=c(-1,3) )
+
+library(glmmML)
+practice <- glm(logit(cumsum(huckbranchmast$Berryness/nrow(huckbranchmast)))) ~ cc * Diameter, data=huckB)
+summary(practice)
+plot(logit(cumsum(huckbranchmast$Berryness/nrow(huckbranchmast)))~cc, data=huckB)
+abline(practice)
