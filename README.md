@@ -45,7 +45,7 @@ huckpatchmast<-merge(huckpatch, photopc3,by=c("Number"))
 #huckpatchmast has all the photos aggregated for each plot
 huckpatchmast2<-merge(huckpatch, photoagg,by=c("Number"))
 
-## Need to see how data look within each plot - are the values close? Sd? And then how to average across - question for Richard McElreath?
+## Need to see how data look within each plot - are the values close? Sd? And then how to average across?
 pairs(huckpatchmast2[,c(6:11,16,23, 30,36, 37,59)])
 
 pairs(huckpatchmast2[,c(6, 11,16,36, 37,59)])
@@ -113,16 +113,22 @@ write.csv(PhotoIDQs, "/PhotoIDQs.csv")
 #####Mean data for each huck id number
 photobranch2agg<-aggregate(photobranch2, list(photobranch2$HuckID),mean)
 
-# final merge
+# final aggregation of data by 1) each photo; 2) each branch
 #huckbranchmast has all the photos split out individually - 587 obs
 huckbranchmast<-merge(huckbranchdata, photobranch2,by=c("HuckID"))
 #huckbranchmast has all the photos aggregated for each branch - 195 obs (lost 3)
 huckbranchmast2<-merge(huckbranchdata, photobranch2agg,by=c("HuckID"))
 
 # Examine without aggregating
-hist(huckbranchmast$Berryness, breaks=10)
+hist(huckbranchmast$Berryness, breaks=15)
 
-# Ordered data... turn it into a cumulative probability
+# Examine with aggregating
+hist(huckbranchmast2$Berryness, breaks=15)
+
+# 2 models: 1) binary logistic; 2) ordered logit
+
+# Model 2: Ordered Logit:
+#Ordered data... turn Berryness into a cumulative probability
 pr_k <- table( huckbranchmast$Berryness ) / nrow(huckbranchmast)
 pr_k
 # cumsum converts to cumulative proportions
@@ -136,29 +142,6 @@ logit <- function(x) log(x/(1-x)) # convenience function
 ( lco <- logit( cum_pr_k ) )  # run the logit of the cumulative probabilities
 plot(names(lco) , lco , type="b" , xlab="Berryness",ylab="logit of cumulative proportion" , ylim=c(-1,3) )
 
-
-pairs(huckbranchmast[,c(8, 9, 10, 12, 14, 15, 16, 18, 19, 22, 23, 41)])
-hist(huckbranchmast$cc)
-
-# Examine with aggregating
-hist(huckbranchmast2$Berryness, breaks=10)
-# Zero (1) inflated
-hist(huckbranchmast2$Diameter, breaks=10)
-#Gaussian.. avg around 1.5
-hist(huckbranchmast2$PrcntClustered, breaks=10)
-#Most around 0 and 1, few in the middle
-hist(huckbranchmast2$BerrySize, breaks=10)
-#zero-inflated, gaussian
-hist(huckbranchmast2$PrcntRipe, breaks=10)
-#Zero-inflated
-hist(huckbranchmast2$cc, breaks=10)
-# High between 80 and 90%
-hist(huckbranchmast2$cc, breaks=20)
-#Gaussian... peak at 85%
-hist(huckbranchmast2$NumClumps, breaks=10)
-#Zero-inflated
-hist(huckbranchmast2$Age, breaks=10)
-#Gaussian
 
 huckB<-huckbranchmast
 
@@ -188,6 +171,8 @@ summary(m2)
 plot(Berry~cc, data= huckbranchmast2)
 lines(predict(m2))
 
+
+
 library(nlme)
 logBerry <- log(cumsum(huckbranchmast2$Berryness/nrow(huckbranchmast2)))
 plot(logBerry)
@@ -197,3 +182,26 @@ summary(practice)
 plot(logit(cumsum(huckbranchmast$Berryness/nrow(huckbranchmast)))~cc, data=huckB)
 abline(practice)
 
+
+pairs(huckbranchmast[,c(8, 9, 10, 12, 14, 15, 16, 18, 19, 22, 23, 41)])
+hist(huckbranchmast$cc)
+
+# Examine with aggregating
+hist(huckbranchmast2$Berryness, breaks=10)
+# Zero (1) inflated
+hist(huckbranchmast2$Diameter, breaks=10)
+#Gaussian.. avg around 1.5
+hist(huckbranchmast2$PrcntClustered, breaks=10)
+#Most around 0 and 1, few in the middle
+hist(huckbranchmast2$BerrySize, breaks=10)
+#zero-inflated, gaussian
+hist(huckbranchmast2$PrcntRipe, breaks=10)
+#Zero-inflated
+hist(huckbranchmast2$cc, breaks=10)
+# High between 80 and 90%
+hist(huckbranchmast2$cc, breaks=20)
+#Gaussian... peak at 85%
+hist(huckbranchmast2$NumClumps, breaks=10)
+#Zero-inflated
+hist(huckbranchmast2$Age, breaks=10)
+#Gaussian
