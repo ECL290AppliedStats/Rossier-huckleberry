@@ -8,23 +8,29 @@ DV = ordered, zero-inflated data ("berryness score")
 Branch-scale IV = canopy cover (hemispheric photos) & stem diameter (at base)
 Plot-scale IV = canopy cover (photos & densiometer) & aspect & soil type & elevation & understory & tree & fuel loading
 
-## PATCH SCALE
-
 ##___PLOT SCALE_DATA EXAMINATION__________________________________________________________
 ## Merge 3 datasets: 1) Photo/PlotName (photoid); 2) Photo/Pixels (photopix); 3) PlotData (huck)
-library(MASS)
-library(boot)
-huckpatch<-read.csv("huckfruitcanopy4.csv")
-plotnum <- huckpatch[,1:3]
-photoid <- read.csv("HuckHemi3.6.15plotcenter.csv")
-photopix2<-read.csv("allphotosv3.csv")
-photopc2<- merge(photoid,photopix2,by=c("Folder","PhotoID"))
-photopc3<- merge(photopc2, plotnum, by=c("PlotNum"))
 
-#Add 2 more columns... 1 total pixels and 1 with % black = canopy closure
-# All total pix columns = same. Good check.
+ library(MASS)
+ 
+ library(boot)
+
+ huckpatch<-read.csv("huckfruitcanopy4.csv")
+ 
+ plotnum <- huckpatch[,1:3]
+ 
+ photoid <- read.csv("HuckHemi3.6.15plotcenter.csv")
+ 
+ photopix2<-read.csv("allphotosv3.csv")
+
+ photopc2<- merge(photoid,photopix2,by=c("Folder","PhotoID"))
+ 
+ photopc3<- merge(photopc2, plotnum, by=c("PlotNum"))
+
+#Add 2 more columns... 1 total pixels and 1 with % black = canopy closure.. Check successful.
 
 photopc3$totalpix <- photopc3$TotalWhite + photopc3$TotalBlack
+
 photopc3$cc <- photopc3$TotalBlack / photopc3$totalpix
 
 #Examine Spread of pixel/canopy cover data. All seems to be rather tight, except for: 26A and 28A -- removed DSC_0859... need to examine 28A further.
@@ -33,13 +39,13 @@ plot(photopc3$PlotNum,photopc3$cc)
 #Aggregate data by plotnumber
 photoagg<-aggregate(photopc3, list(photopc3$Number),mean)
 
-# final merge
+# final merge - a question here...
 #huckpatchmast has all the photos split out individually
 huckpatchmast<-merge(huckpatch, photopc3,by=c("Number"))
 #huckpatchmast has all the photos aggregated for each plot
 huckpatchmast2<-merge(huckpatch, photoagg,by=c("Number"))
 
-## Need to see how data look within each plot - are the values close? Sd? And then how to average across?
+## Need to see how data look within each plot - are the values close? Sd? And then how to average across - question for Richard McElreath?
 pairs(huckpatchmast2[,c(6:11,16,23, 30,36, 37,59)])
 
 pairs(huckpatchmast2[,c(6, 11,16,36, 37,59)])
@@ -104,7 +110,7 @@ write.csv(PhotoIDQs, "/PhotoIDQs.csv")
 
 #Aggregate = though still need to address 112, 181, 60, 63
 
-#####Mean data for each huck id number ... but would like to preserve all data if possible.. how?
+#####Mean data for each huck id number
 photobranch2agg<-aggregate(photobranch2, list(photobranch2$HuckID),mean)
 
 # final merge
@@ -154,32 +160,40 @@ hist(huckbranchmast2$NumClumps, breaks=10)
 hist(huckbranchmast2$Age, breaks=10)
 #Gaussian
 
-huckB<-huckbranchmast2
+huckB<-huckbranchmast
 
 # Goal: Berryness ~ CanopyCover * StemDiam* TreeStuff* UnderstoryStuff * LitterDuff * SoilType * Elev * Aspect
+#1st Try unfinished
+library(glmmML)
+practice <- glm(logit(cumsum(huckbranchmast$Berryness/nrow(huckbranchmast)))) ~ cc * Diameter, data=huckB)
+summary(practice)
+plot(logit(cumsum(huckbranchmast$Berryness/nrow(huckbranchmast)))~cc, data=huckB)
+abline(practice)
 
-glmm(Berryness ~ cc * Diamter * SoilType * AspectDeg, data=huckB)
+#2nd Try...
+## Richard suggestion:
+# Fit a logistic model for "had berries" and an ordered logit model for "ripeness". 
+#Berryness... 1-5 --> 0-4
+huckbranchmast2$Berryness2<-huckbranchmast2$Berryness-1
 
+#Berry presence/absense ... if 0 vs if 1-4
+huckbranchmast2$Berry <- ifelse(huckbranchmast2$Berryness2==0, 0, 1)
 
-##Standardize data...
-huckB$Berryness
-huckB$cc.s <- (huckB$cc-mean(huckB$cc))/
-  sd(huckB$cc)
-huckB$Berryness.s <- (huckB$Berryness-mean(huckB$Berryness))/
-  sd(huckB$Berryness)
+#Model for flowering:
+m1<-glm(Berry~(cc+I(cc^2))*Diameter, data= huckbranchmast2,family = binomial)
+summary(m1)
 
-#Model 1Bs - Berryness~ cc standardized.
-huck1Bs <- glm(Berryness.s~cc.s, data=huckB)
-summary(huck1Bs)
-plot(huck1Bs)
-##Berryness.s = 0 - 0.4939(cc.s)
-plot(huckB$Berryness.s ~ huckB$cc.s)
-abline(a=coef(huck1Bs)[1] , b=coef(huck1Bs)[2])
+m2<-glm(Berry~(cc+I(cc^2)), data= huckbranchmast2,family = binomial)
+summary(m2)
+plot(Berry~cc, data= huckbranchmast2)
+lines(predict(m2))
 
-#Model 2Bs - Berryness~ cc standardized.
-huck2Bs <- lm(Berryness.s~I(cc.s^2), data=huckB)
-summary(huck2Bs)
-##Berryness.s = 0 - 0.4939(cc.s)
-plot(huckB$Berryness.s ~ huckB$cc.s)
-abline(a=coef(huck2Bs)[1] , b=coef(huck2Bs)[2]) 
+library(nlme)
+logBerry <- log(cumsum(huckbranchmast2$Berryness/nrow(huckbranchmast2)))
+plot(logBerry)
+
+glmer1 <- glmer(Berryness ~ fixed = (cc+I(cc^2)) * Diameter, random = PlotName data=huckpatchmast2)
+summary(practice)
+plot(logit(cumsum(huckbranchmast$Berryness/nrow(huckbranchmast)))~cc, data=huckB)
+abline(practice)
 
